@@ -1,0 +1,10 @@
+/__pycache__
+/.venv
+/.vscode
+
+/*log
+
+/raw_dataset
+/results
+
+.env
