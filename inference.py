@@ -1,15 +1,14 @@
 import argparse
 import asyncio
-import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, cast
 
-from dotenv import load_dotenv
-
 from mbtibench.enums import MbtiDimension, ModelName, PromptMethodName
 from mbtibench.executer import Executer
 from mbtibench.llm import LLM
+from mbtibench.prompt import get_prompt_method_cls
+from mbtibench.utils import get_base_url_and_api_key
 
 
 @dataclass
@@ -21,23 +20,15 @@ class Arguments:
 
 
 async def main(args: Arguments):
-    if args.host is None and args.port is None:
-        load_dotenv()
-        base_url = os.getenv("BASE_URL")
-        api_key = os.getenv("API_KEY")
-    elif args.host is not None and args.port is not None:
-        base_url = f"http://{args.host}:{args.port}/v1"
-        api_key = "EMPTY"
-    else:
-        raise ValueError("Either both host and port should be provided or neither")
-
+    base_url, api_key = get_base_url_and_api_key(args.host, args.port)
     llm = LLM(args.model, base_url, api_key)
     dataset_path = Path("dataset") / "mbtibench.jsonl"
     tasks = []
     for dim in MbtiDimension:
         database_path = Path("results") / f"{args.model}--{args.method}.db"
         executer = Executer(dataset_path, database_path, dim)
-        tasks.append(executer.run(llm, args.method))
+        method_cls = get_prompt_method_cls(args.method)
+        tasks.append(executer.run(llm, method_cls))
 
     await asyncio.gather(*tasks)
 

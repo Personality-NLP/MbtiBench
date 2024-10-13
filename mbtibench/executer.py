@@ -3,13 +3,13 @@ import json
 import logging
 import sqlite3
 from pathlib import Path
-from typing import Coroutine, Dict, Iterable, List, Sequence, Tuple
+from typing import Any, Coroutine, Dict, Iterable, List, Sequence
 
 from tqdm.auto import tqdm
 
-from .enums import MbtiDimension, PromptMethodName, SubDataset
+from .enums import MbtiDimension
 from .llm import LLM
-from .prompt import PromptMethod, get_prompt_method
+from .prompt import PromptMethod
 
 logger = logging.getLogger(__name__)
 
@@ -37,23 +37,28 @@ class Executer:
         self._init_database()
         self._load_data_to_resume(dataset_path)
 
+    @property
+    def _init_database_sql(self) -> str:
+        return (
+            f"CREATE TABLE IF NOT EXISTS {self._dim.only_letter} "
+            f"(id INTEGER PRIMARY KEY, messages TEXT, response TEXT, softlabel REAL, hardlabel TEXT)"
+        )
+
     def _init_database(self):
         self._database_path.parent.mkdir(parents=True, exist_ok=True)
 
         conn = sqlite3.connect(self._database_path)
         c = conn.cursor()
-        c.execute(
-            f"CREATE TABLE IF NOT EXISTS {self._dim.only_letter} (id INTEGER PRIMARY KEY, messages TEXT, response TEXT, softlabel REAL, hardlabel TEXT)"
-        )
+        c.execute(self._init_database_sql)
         conn.commit()
         conn.close()
 
-    def _load_all_data(self, dataset_path) -> List[Dict]:
+    def _load_all_data(self, dataset_path: Path) -> List[Dict]:
         with open(dataset_path) as f:
             lines = f.readlines()
         return [json.loads(line.strip()) for line in lines]
 
-    def _load_data_to_resume(self, dataset_path):
+    def _load_data_to_resume(self, dataset_path: Path):
         conn = sqlite3.connect(self._database_path)
         c = conn.cursor()
         c.execute(f"SELECT id, messages FROM {self._dim.only_letter}")
@@ -71,24 +76,15 @@ class Executer:
 
         logger.info(f"Left {len(self.data_to_resume)} data to resume (Total {len(all_data)})")
 
-    async def _single_run(
-        self,
-        llm: LLM,
-        dataset: SubDataset,
-        method: PromptMethodName,
-        user_posts: str,
-        data_id: int,
-        data_softlabel: float,
-        data_hardlabel: str,
-    ) -> Tuple[int, str, str]:
-        user_posts_str, user_posts_count = "", 1
+    async def _single_run(self, llm: LLM, data: Dict, method_cls: Any) -> Dict:
+        user_posts, user_posts_str, user_posts_count = data["posts"], "", 1
         for i in range(len(user_posts)):
             if len(user_posts[i]) > 10:
                 post = llm.tokenizer.decode(llm.tokenizer.encode(user_posts[i].replace("{", "").replace("}", ""))[:80])
                 user_posts_str += f"Post {user_posts_count}: {post}; "
                 user_posts_count += 1
 
-        prompt_method: PromptMethod = get_prompt_method(dataset, self._dim, user_posts_str, method)
+        prompt_method: PromptMethod = method_cls(data["source"], self._dim, user_posts_str)
         prompts = prompt_method.prompts
 
         messages = llm.chat(prompts)
@@ -96,35 +92,36 @@ class Executer:
         assert messages[-1]["role"] == "assistant"
         response = messages[-1]["content"]
 
-        return data_id, llm.show_real_prompt(messages), response, data_softlabel, data_hardlabel
+        return {
+            "id": data["id"],
+            "messages": llm.show_real_prompt(messages),
+            "response": response,
+            "softlabel": data["softlabels"][self._dim.value],
+            "hardlabel": data["hardlabels"][self._dim.value],
+        }
 
-    async def run(self, llm: LLM, method: PromptMethodName):
+    @property
+    def _update_database_sql(self) -> str:
+        return (
+            f"INSERT OR REPLACE INTO {self._dim.only_letter} "
+            f"(id, messages, response, softlabel, hardlabel) "
+            f"VALUES "
+            f"(:id, :messages, :response, :softlabel, :hardlabel)"
+        )
+
+    async def run(self, llm: LLM, method_cls: Any):
         conn = sqlite3.connect(self._database_path)
         c = conn.cursor()
 
         # batch_size is for database write-back
         # concurrency is for async calls to OpenAI API
         for batched_data in tqdm(batch(self.data_to_resume, batch_size=20), desc=f"{self._dim}"):
-            tasks = [
-                self._single_run(
-                    llm,
-                    data["source"],
-                    method,
-                    data["posts"],
-                    data["id"],
-                    data["softlabels"][self._dim.value],
-                    data["hardlabels"][self._dim.value],
-                )
-                for data in batched_data
-            ]
+            tasks = [self._single_run(llm, data, method_cls) for data in batched_data]
             logger.info(f"Running batched {len(tasks)} tasks")
             results = await asyncio.gather(*_limit_concurrency(tasks, concurrency=10))
 
-            for data_id, messages_str, response, data_softlabel, data_hardlabel in results:
-                c.execute(
-                    f"INSERT OR REPLACE INTO {self._dim.only_letter} (id, messages, response, softlabel, hardlabel) VALUES (?, ?, ?, ?, ?)",
-                    (data_id, messages_str, response, data_softlabel, data_hardlabel),
-                )
+            for result in results:
+                c.execute(self._update_database_sql, result)
             conn.commit()
 
         conn.close()

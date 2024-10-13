@@ -111,7 +111,17 @@ class Evaluator:
         # model score is 1~9, convert to 0~1
         return np.array([(self._get_score_from_text(id, response) - 1) / 8 for id, response in db_data])
 
+    def _get_baseline_softlabels(self) -> np.ndarray:
+        conn = sqlite3.connect(self._database_path)
+        c = conn.cursor()
+        c.execute(f"SELECT softlabel FROM {self._dim.only_letter}")
+        db_data = c.fetchall()
+        conn.close()
+
+        return np.repeat(np.mean(db_data), len(db_data))
+
     def eval(self, metrics: List[MetricName]) -> List[float]:
+        # y_true, y_pred = np.array(self._get_human_softlables()), np.array(self._get_baseline_softlabels())
         y_true, y_pred = np.array(self._get_human_softlables()), np.array(self._get_model_softlabels())
         # y_true, y_pred = np.array(self._get_human_softlables())[:96], np.array(self._get_model_softlabels())[:96]
         # y_true, y_pred = (

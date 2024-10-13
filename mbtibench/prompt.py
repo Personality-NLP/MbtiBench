@@ -1,4 +1,4 @@
-from typing import List
+from typing import Any, List
 
 from typing_extensions import assert_never
 
@@ -24,14 +24,14 @@ class PromptMethod:
         return [{"role": "system", "content": self._system_prompt}] + self._turns
 
 
-def get_prompt_method(dataset: SubDataset, dim: MbtiDimension, user_posts: str, method: str) -> PromptMethod:
+def get_prompt_method_cls(method: PromptMethodName) -> Any:
     method_mapper = {
         PromptMethodName.ZERO_SHOT: ZeroShotMethod,
         PromptMethodName.STEP_BY_STEP: StepByStepMethod,
         PromptMethodName.FEW_SHOT: FewShotMethod,
         PromptMethodName.PSYCOT: PsycotMethod,
     }
-    return method_mapper[method](dataset, dim, user_posts)
+    return method_mapper[method]
 
 
 class ZeroShotMethod(PromptMethod):
