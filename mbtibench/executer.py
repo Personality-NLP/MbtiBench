@@ -7,7 +7,7 @@ from typing import Any, Coroutine, Dict, Iterable, List, Sequence
 
 from tqdm.auto import tqdm
 
-from .enums import MbtiDimension
+from .enums import LabelType, MbtiDimension
 from .llm import LLM
 from .prompt import PromptMethod
 
@@ -30,9 +30,10 @@ def _limit_concurrency(coroutines: Sequence[Coroutine], concurrency: int) -> Lis
 
 
 class Executer:
-    def __init__(self, dataset_path: Path, database_path: Path, dim: MbtiDimension):
+    def __init__(self, dataset_path: Path, database_path: Path, dim: MbtiDimension, type: LabelType):
         self._database_path = database_path
         self._dim = dim
+        self._type = type
 
         self._init_database()
         self._load_data_to_resume(dataset_path)
@@ -41,7 +42,20 @@ class Executer:
     def _init_database_sql(self) -> str:
         return (
             f"CREATE TABLE IF NOT EXISTS {self._dim.only_letter} "
-            f"(id INTEGER PRIMARY KEY, messages TEXT, response TEXT, softlabel REAL, hardlabel TEXT)"
+            f"(id INTEGER PRIMARY KEY, messages TEXT, response TEXT, softlabel REAL, hardlabel TEXT, labeltype TEXT)"
+        )
+
+    @property
+    def _load_database_sql(self) -> str:
+        return f"SELECT id, messages FROM {self._dim.only_letter}"
+
+    @property
+    def _update_database_sql(self) -> str:
+        return (
+            f"INSERT OR REPLACE INTO {self._dim.only_letter} "
+            f"(id, messages, response, softlabel, hardlabel, labeltype) "
+            f"VALUES "
+            f"(:id, :messages, :response, :softlabel, :hardlabel, :labeltype)"
         )
 
     def _init_database(self):
@@ -61,7 +75,7 @@ class Executer:
     def _load_data_to_resume(self, dataset_path: Path):
         conn = sqlite3.connect(self._database_path)
         c = conn.cursor()
-        c.execute(f"SELECT id, messages FROM {self._dim.only_letter}")
+        c.execute(self._load_database_sql)
         db_data = c.fetchall()
         conn.close()
 
@@ -89,25 +103,14 @@ class Executer:
 
         messages = llm.chat(prompts)
 
-        assert messages[-1]["role"] == "assistant"
-        response = messages[-1]["content"]
-
         return {
             "id": data["id"],
             "messages": llm.show_real_prompt(messages),
-            "response": response,
+            "response": messages[-1]["content"],
             "softlabel": data["softlabels"][self._dim.value],
             "hardlabel": data["hardlabels"][self._dim.value],
+            "labeltype": self._type.value,
         }
-
-    @property
-    def _update_database_sql(self) -> str:
-        return (
-            f"INSERT OR REPLACE INTO {self._dim.only_letter} "
-            f"(id, messages, response, softlabel, hardlabel) "
-            f"VALUES "
-            f"(:id, :messages, :response, :softlabel, :hardlabel)"
-        )
 
     async def run(self, llm: LLM, method_cls: Any):
         conn = sqlite3.connect(self._database_path)

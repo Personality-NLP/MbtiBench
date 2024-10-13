@@ -2,10 +2,10 @@ import logging
 import re
 import sqlite3
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import numpy as np
-from sklearn.metrics import mean_absolute_error, root_mean_squared_error
+from sklearn.metrics import accuracy_score, f1_score, mean_absolute_error, root_mean_squared_error
 from typing_extensions import assert_never
 
 from .enums import MbtiDimension, MetricName
@@ -24,6 +24,10 @@ class Metric:
             return cls._bucket_mae_score(y_true, y_pred)
         elif name == MetricName.S_RMSE:
             return cls._bucket_rmse_score(y_true, y_pred)
+        elif name == MetricName.ACC:
+            return cls._acc_score(y_true, y_pred)
+        elif name == MetricName.F1:
+            return cls._f1_score(y_true, y_pred)
         else:
             assert_never()
 
@@ -61,6 +65,47 @@ class Metric:
 
         return cls._rmse_score(y_true_binned, y_pred_binned)
 
+    @classmethod
+    def _acc_score(cls, y_true: np.ndarray, y_pred: np.ndarray) -> float:
+        return accuracy_score(y_true, y_pred)
+
+    @classmethod
+    def _f1_score(cls, y_true: np.ndarray, y_pred: np.ndarray) -> float:
+        return f1_score(y_true, y_pred, average="macro")
+
+
+class Exacter:
+    @classmethod
+    def get_softlabel(cls, text: str) -> Optional[float]:
+        model_score = re.findall(r"\[\[\b(10(\.0{1,3})?|[0-9](\.[0-9]{1,3})?)\b\]\]", text)  # [[4.25]] / [[8]]
+        if len(model_score) == 0 or len(model_score[0]) == 0:
+            model_score = re.findall(r"\[\b(10(\.0{1,3})?|[0-9](\.[0-9]{1,3})?)\b\]", text)  # [4.25] / [8]
+        if len(model_score) == 0 or len(model_score[0]) == 0:
+            logger.info(f"Bad response from model: {text}")
+            return None
+        else:
+            # model score is 1~9, convert to 0~1
+            return (float(model_score[0][0]) - 1) / 8
+
+    @classmethod
+    def get_hardlabel(cls, dim: MbtiDimension, text: str) -> Optional[str]:
+        first_letter_valid_choices_lower = ["a", "<a>", dim.first_letter.lower()]
+        second_letter_valid_choices_lower = ["b", "<b>", dim.second_letter.lower()]
+        if f"choice: {first_letter_valid_choices_lower}" in text.lower():
+            return dim.first_letter
+        elif f"choice: {second_letter_valid_choices_lower}" in text.lower():
+            return dim.second_letter
+        else:
+            return None
+
+    @classmethod
+    def get_hardlabel_as_softlabel(cls, dim: MbtiDimension, text: str) -> Optional[float]:
+        hardlabel = cls.get_hardlabel(dim, text)
+        if hardlabel is None:
+            return None
+        else:
+            return 1.0 if hardlabel == dim.first_letter else 0.0
+
 
 class Evaluator:
     def __init__(self, database_path: Path, dim: MbtiDimension):
@@ -68,13 +113,17 @@ class Evaluator:
         self._dim = dim
 
         self._validate()
+    
+    @property
+    def _validate_database_sql(self)->str:
+        return f"SELECT id, response FROM {self._dim.only_letter}"
 
     def _validate(self):
         assert self._database_path.exists()
 
         conn = sqlite3.connect(self._database_path)
         c = conn.cursor()
-        c.execute(f"SELECT id, response FROM {self._dim.only_letter}")
+        c.execute(self._validate_database_sql)
         db_data = c.fetchall()
         conn.close()
         assert len(db_data) == 286  # MbtiBench dataset size
@@ -92,14 +141,12 @@ class Evaluator:
         return np.array([softlabel[0] for softlabel in db_data])
 
     def _get_score_from_text(self, id: int, text: str) -> float:
-        model_score = re.findall(r"\[\[\b(10(\.0{1,3})?|[0-9](\.[0-9]{1,3})?)\b\]\]", text)  # [[4.25]] / [[8]]
-        if len(model_score) == 0 or len(model_score[0]) == 0:
-            model_score = re.findall(r"\[\b(10(\.0{1,3})?|[0-9](\.[0-9]{1,3})?)\b\]", text)  # [4.25] / [8]
-        if len(model_score) == 0 or len(model_score[0]) == 0:
-            logger.info(f"Data id={id}, bad response from model: {text}, using default 5 score")
-            return 5
+        score = Exacter.get_softlabel(text)
+        if score is not None:
+            return score
         else:
-            return float(model_score[0][0])
+            logger.info(f"Data id={id}, bad response from model: {text}, using default 0.5 score")
+            return 0.5
 
     def _get_model_softlabels(self) -> np.ndarray:
         conn = sqlite3.connect(self._database_path)
@@ -108,8 +155,7 @@ class Evaluator:
         db_data = c.fetchall()
         conn.close()
 
-        # model score is 1~9, convert to 0~1
-        return np.array([(self._get_score_from_text(id, response) - 1) / 8 for id, response in db_data])
+        return np.array([self._get_score_from_text(id, response) for id, response in db_data])
 
     def _get_baseline_softlabels(self) -> np.ndarray:
         conn = sqlite3.connect(self._database_path)

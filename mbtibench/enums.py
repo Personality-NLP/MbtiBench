@@ -50,6 +50,19 @@ class MbtiDimension(Enum):
     def only_letter(self) -> str:
         return self.value.replace("/", "")
 
+    @property
+    def full_hard_choices(self) -> str:
+        if self == MbtiDimension.EI:
+            return 'A: "Extraversion" or B: "Introversion"'
+        elif self == MbtiDimension.SN:
+            return 'A: "Sensing" or B: "Intuition"'
+        elif self == MbtiDimension.TF:
+            return 'A: "Thinking" or B: "Feeling"'
+        elif self == MbtiDimension.JP:
+            return 'A: "Judging" or B: "Perceiving"'
+        else:
+            assert_never()
+
 
 class SubDataset(Enum):
     KAGGLE = "kaggle"
@@ -99,6 +112,16 @@ class MetricName(Enum):
     RMSE = "RMSE"
     S_MAE = "S-MAE"
     S_RMSE = "S-RMSE"
+    ACC = "ACC"
+    F1 = "F1"
+
+    def __str__(self) -> str:
+        return self.value
+
+
+class LabelType(Enum):
+    SOFT = "soft"
+    HARD = "hard"
 
     def __str__(self) -> str:
         return self.value

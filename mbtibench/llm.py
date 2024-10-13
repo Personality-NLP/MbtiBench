@@ -14,25 +14,29 @@ class LLM:
     def __init__(self, name: ModelName, base_url: str, api_key: str):
         self._model_name = name
         self._model = OpenAI(base_url=base_url, api_key=api_key)
-        self._tokenizer = self._get_tokenizer(name)
+        self._tokenizer, self._tokenizer_for_demonstration = self._get_tokenizer(name)
 
     @property
     def tokenizer(self) -> PreTrainedTokenizer:
         return self._tokenizer
 
-    def _get_tokenizer(self, name: ModelName) -> PreTrainedTokenizer:
+    def _get_tokenizer(self, name: ModelName) -> Tuple[PreTrainedTokenizer, PreTrainedTokenizer]:
         if name.is_gpt4:
-            tokenizer = tokenizer = tiktoken.encoding_for_model(name)
+            tokenizer = tiktoken.encoding_for_model(name.value)
+            tokenizer_for_demo = AutoTokenizer.from_pretrained("/home/share/models/gpt-4")
+            tokenizer_for_demo.add_bos_token = False
         elif name.is_llama3_1:
             tokenizer = AutoTokenizer.from_pretrained("/home/share/models/Meta-Llama-3.1-70B-Instruct")
             tokenizer.add_bos_token = False
+            tokenizer_for_demo = tokenizer
         elif name.is_qwen2:
             tokenizer = AutoTokenizer.from_pretrained("/home/share/models/Qwen2-72B-Instruct")
             tokenizer.add_bos_token = False
+            tokenizer_for_demo = tokenizer
         else:
             raise ValueError(f"Tokenizer not found for model {name}")
 
-        return tokenizer
+        return tokenizer, tokenizer_for_demo
 
     def extract_prompt(self, messages: List[Dict[str, str]]) -> Tuple[Optional[List[Dict[str, str]]], Optional[int]]:
         assert messages[0]["role"] == "system"
@@ -82,7 +86,11 @@ class LLM:
             response_content = self._chat_one_turn(extracted_messages, temperature, max_tokens)
             messages[placeholder_index]["content"] = response_content
 
+        assert messages[-1]["role"] == "assistant"
+
         return messages
 
     def show_real_prompt(self, messages: List[Dict[str, str]]) -> str:
-        return self._tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False)
+        return self._tokenizer_for_demonstration.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=False
+        )
