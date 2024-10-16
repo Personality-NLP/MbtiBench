@@ -917,7 +917,7 @@ if __name__ == "__main__":
         softlabels, hardlabels = {}, {}
         for dim in dims:
             annotation = "".join(data["annotation"][dim].values())
-            softlabel = results_dict[dim][annotation]
+            softlabel = 1 - results_dict[dim][annotation]
             hardlabel = dim[0] if annotation.count(dim[0]) >= 2 else dim[-1]
             softlabels[dim] = softlabel
             hardlabels[dim] = hardlabel
