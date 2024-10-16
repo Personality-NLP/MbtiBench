@@ -63,7 +63,7 @@ class ZeroShotMethodHard(ZeroShotMethodSoft):
 class StepByStepMethodSoft(PromptMethod):
     @property
     def _system_prompt(self):
-        return f"""Given the following text from a user's social media posts, determine the {self._dim.rank} dimension ({self._dim.full_name}) of Myers-Briggs Type Indicator (MBTI) personality type best fits the user. You need to rate the statement with a score 1-9, where 1=more {self._dim.first_letter} and 9=more {self._dim.second_letter}, output your final score by strictly following this format: "[[score]]" and do not give reason. Let's think step by step"""
+        return f"""Given the following text from a user's social media posts, determine the {self._dim.rank} dimension ({self._dim.full_name}) of Myers-Briggs Type Indicator (MBTI) personality type best fits the user. You need to rate the statement with a score 1-9, where 1=more {self._dim.first_letter} and 9=more {self._dim.second_letter}, output your final score by strictly following this format: "[[score]]". Let's think step by step"""
 
     @property
     def _last_turn(self):
@@ -100,12 +100,7 @@ class FewShotMethodSoft(PromptMethod):
         return [
             {
                 "role": "user",
-                "content": f"""Consider the first example: {first_shot}
-The score is {first_score}
-Consider the second example: {second_shot}
-The score is {second_score}
-Consider the third example: {self._user_posts}
-The choice is """,
+                "content": f"""Consider the first example: {first_shot}\nThe score is {first_score}\nConsider the second example: {second_shot}\nThe score is {second_score}\nConsider the third example: {self._user_posts}\nThe choice is """,
             },
             {"role": "assistant", "content": "[[PLACEHOLDER]]"},
         ]
@@ -253,9 +248,7 @@ class FewShotMethodHard(FewShotMethodSoft):
 class PsycotMethodSoft(PromptMethod):
     @property
     def _system_prompt(self):
-        return f"""You are an AI assistant who specializes in text analysis and I am User. We will complete a text analysis task together through a multi-turn dialogue. The task is as follows: we have a set of posts written by an author, and at each turn I will give you a Question about the author. According to the author's posts, you need to choose the possible options ONLY. DO NOT give your reason, just wait for the next user input. After opting all the choices, I will ask you the {self._dim.rank} dimension ({self._dim.full_name}) score of the author. You need to rate the statement with a score 1-9, where 1=more {self._dim.first_letter} and 9=more {self._dim.second_letter}.
-AUTHOR'S POSTS: {self._user_posts}
-"""
+        return f"""You are an AI assistant who specializes in text analysis and I am User. We will complete a text analysis task together through a multi-turn dialogue. The task is as follows: we have a set of posts written by an author, and at each turn I will give you a Question about the author. According to the author's posts, you need to choose the possible options ONLY. DO NOT give your reason, just wait for the next user input. After opting all the choices, I will ask you the {self._dim.rank} dimension ({self._dim.full_name}) score of the author. You need to rate the statement with a score 1-9, where 1=more {self._dim.first_letter} and 9=more {self._dim.second_letter}.\nAUTHOR'S POSTS: {self._user_posts}\n"""
 
     @property
     def _last_turn(self):
@@ -361,9 +354,7 @@ AUTHOR'S POSTS: {self._user_posts}
 class PsycotMethodHard(PsycotMethodSoft):
     @property
     def _system_prompt(self):
-        return f"""You are an AI assistant who specializes in text analysis and I am User. We will complete a text analysis task together through a multi-turn dialogue. The task is as follows: we have a set of posts written by an author, and at each turn I will give you a Question about the author. According to the author's posts, you need to choose the possible options ONLY. DO NOT give your reason, just wait for the next user input. After opting all the choices, I will ask you if the author is {self._dim.full_hard_choices}, and then you need to give your choice.
-AUTHOR'S POSTS: {self._user_posts}
-"""
+        return f"""You are an AI assistant who specializes in text analysis and I am User. We will complete a text analysis task together through a multi-turn dialogue. The task is as follows: we have a set of posts written by an author, and at each turn I will give you a Question about the author. According to the author's posts, you need to choose the possible options ONLY. DO NOT give your reason, just wait for the next user input. After opting all the choices, I will ask you if the author is {self._dim.full_hard_choices}, and then you need to give your choice.\nAUTHOR'S POSTS: {self._user_posts}\n"""
 
     @property
     def _last_turn(self):

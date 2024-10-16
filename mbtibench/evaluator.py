@@ -89,13 +89,14 @@ class Exacter:
 
     @classmethod
     def get_hardlabel(cls, dim: MbtiDimension, text: str) -> Optional[str]:
-        first_letter_valid_choices_lower = ["a", "<a>", dim.first_letter.lower()]
-        second_letter_valid_choices_lower = ["b", "<b>", dim.second_letter.lower()]
-        if f"choice: {first_letter_valid_choices_lower}" in text.lower():
+        first_letter_valid_choices_lower = ["choice: a", "choice: <a>", f"choice: {dim.first_letter.lower()}"]
+        second_letter_valid_choices_lower = ["choice: b", "choice: <b>", f"choice: {dim.second_letter.lower()}"]
+        if text.lower() in first_letter_valid_choices_lower:
             return dim.first_letter
-        elif f"choice: {second_letter_valid_choices_lower}" in text.lower():
+        elif text.lower() in second_letter_valid_choices_lower:
             return dim.second_letter
         else:
+            logger.info(f"Bad response from model: {text}")
             return None
 
     @classmethod
@@ -113,9 +114,9 @@ class Evaluator:
         self._dim = dim
 
         self._validate()
-    
+
     @property
-    def _validate_database_sql(self)->str:
+    def _validate_database_sql(self) -> str:
         return f"SELECT id, response FROM {self._dim.only_letter}"
 
     def _validate(self):
