@@ -20,6 +20,8 @@ def main(args: Arguments):
     results: Dict[MbtiDimension, List[Tuple[float, float]]] = {dim: [] for dim in MbtiDimension}
 
     for round in range(1, 5 + 1):
+        if args.model.is_gpt4 and round > 1:
+            break  # GPT-4 only has 1 round
         for dim in MbtiDimension:
             database_path = Path("results") / f"round-{round}" / f"{args.type}--{args.model}--{args.method}.db"
             evalutor = Evaluator(database_path, dim)
@@ -39,8 +41,8 @@ def main(args: Arguments):
 
     # 打印结果
     for dim, (avg_rmse, std_rmse, avg_mae, std_mae) in avg_results.items():
-        print(f"{avg_rmse:.3f},{avg_mae:.3f}", end=",")
-        # print(f"{avg_rmse:.3f}±{std_rmse:.3f},{avg_mae:.3f}±{std_mae:.3f}", end=",")
+        # print(f"{avg_rmse:.3f},{avg_mae:.3f}", end=",")
+        print(f"{avg_rmse:.3f}±{std_rmse:.3f},{avg_mae:.3f}±{std_mae:.3f}", end=",")
     print()  # 换行
 
 

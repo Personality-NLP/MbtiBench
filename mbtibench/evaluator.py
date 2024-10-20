@@ -120,14 +120,16 @@ class Evaluator:
         return f"SELECT id, response FROM {self._dim.only_letter}"
 
     def _validate(self):
-        assert self._database_path.exists()
+        assert self._database_path.exists(), f"Database not found: {self._database_path}"
 
         conn = sqlite3.connect(self._database_path)
         c = conn.cursor()
         c.execute(self._validate_database_sql)
         db_data = c.fetchall()
         conn.close()
-        assert len(db_data) == 286  # MbtiBench dataset size
+        assert (
+            len(db_data) == 286
+        ), f"Database {self._database_path} len = {len(db_data)} != 286"  # MbtiBench dataset size
 
         for row in db_data:
             assert "OPENAI API ERROR" not in row[1]
@@ -170,13 +172,4 @@ class Evaluator:
     def eval(self, metrics: List[MetricName]) -> List[float]:
         # y_true, y_pred = np.array(self._get_human_softlables()), np.array(self._get_baseline_softlabels())
         y_true, y_pred = np.array(self._get_human_softlables()), np.array(self._get_model_softlabels())
-        # y_true, y_pred = np.array(self._get_human_softlables())[:96], np.array(self._get_model_softlabels())[:96]
-        # y_true, y_pred = (
-        #     np.array(self._get_human_softlables())[96 : 96 + 94],
-        #     np.array(self._get_model_softlabels())[96 : 96 + 94],
-        # )
-        # y_true, y_pred = (
-        #     np.array(self._get_human_softlables())[96 + 94 :],
-        #     np.array(self._get_model_softlabels())[96 + 94 :],
-        # )
         return [Metric.compute(metric, y_true, y_pred) for metric in metrics]
