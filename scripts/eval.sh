@@ -6,16 +6,23 @@ methods=(
 )
 
 models=(
-    llama3.1-8b
+    gpt-4o-mini
+    gpt-4o
+    qwen2-7b
     qwen2-72b
+    llama3.1-8b
     llama3.1-70b
 )
-    # gpt-4o-mini
-    # gpt-4o
-    # qwen2-7b
 
-for m in ${methods[@]}; do
+types=(
+    soft
+)
+    # hard
+
+for t in ${types[@]}; do
     for b in ${models[@]}; do
-        python evaluate.py --model $b --method $m
+        for m in ${methods[@]}; do
+            python evaluate.py --model $b --method $m --type $t
+        done
     done
 done

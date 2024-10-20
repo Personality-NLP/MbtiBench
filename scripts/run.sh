@@ -10,11 +10,11 @@
 . .venv/bin/activate
 
 if [ $model = "gpt-4o-mini" ] || [ $model = "gpt-4o" ]; then
-    python inference.py --method $method --type $type --model $model
+    python inference.py --method $method --type $type --model $model --round $round
 elif [ $model = "qwen2-72b" ] || [ $model = "qwen2-7b" ]; then
-    python inference.py --method $method --type $type --model $model --host gpu07 --port 58000
+    python inference.py --method $method --type $type --model $model --round $round --host gpu07 --port 58000
 elif [ $model = "llama3.1-70b" ] || [ $model = "llama3.1-8b" ]; then
-    python inference.py --method $method --type $type --model $model --host gpu07 --port 58111
+    python inference.py --method $method --type $type --model $model --round $round --host gpu07 --port 58111
 else
     echo "Unknown model: $model"
 fi
