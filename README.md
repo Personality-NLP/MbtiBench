@@ -1,4 +1,8 @@
+<div align="center">
+
 # <span style="font-variant:small-caps;">MbtiBench</span>
+
+</div>
 
 Code for <span style="font-variant:small-caps;">*MbtiBench*</span> *: An MBTI Personality Detection Dataset Aligned with Population Traits*
 
@@ -124,7 +128,7 @@ $ python inference.py --method zero-shot --type soft --model llama3.1-70b --host
 
 To facilitate batch evaluation, we provide `launcher.sh`. You can submit batch evaluation tasks by running `bash launcher.sh`.
 
-### 📊 Result Summarization
+### 📈 Result Summarization
 
 Below is an example command for calculating metrics for personality detection:
 ```shell
@@ -132,3 +136,24 @@ $ python evaluate.py --model llama3.1-70b --method zero-shot --type soft
 ```
 
 To facilitate batch metric calculations, we provide a script to get results. You can run `bash scripts/eval.sh` to compute scores in batch.
+
+## 📊 Results
+
+We evaluate the GPT-4o series, Qwen2 series, and Llama3.1 series on <span style="font-variant:small-caps;">MbtiBench</span> using four prompt templates: Zero-shot, Step-by-step, Few-shot, and PsyCoT. The LLMs are tasked with predicting the soft labels for the four personality dimensions, and the results are shown in the table below.
+
+![](./images/softlabel.png)
+
+> For the Qwen2 and Llama3.1 series, we repeat the experiments 5 times and displayed the average and standard deviation of the 5 runs in the table. For the GPT-4o series, we conducte only one experiment.
+
+We use S-RMSE (Segmented Root Mean Square Error) and S-MAE (Segmented Mean Absolute Error) as evaluation metrics for soft labels, with the formulas as follows:
+```math
+\begin{align*}
+  \text{S-RMSE} &= \sqrt{\frac{1}{n} \sum_{i=1}^n (bin(y_i) - bin(\hat{y}_i))^2} \\
+  \text{S-MAE} &= \frac{1}{n} \sum_{i=1}^{n} |bin(y_i) - bin(\hat{y}_i)|
+\end{align*}
+```
+
+You can find more detailed information in our paper.
+
+> [!NOTE]
+> Our experiment logs can be found [here](./results-reproduce) for reproducing the results shown in the table.
