@@ -8,7 +8,7 @@ import numpy as np
 from sklearn.metrics import accuracy_score, f1_score, mean_absolute_error, root_mean_squared_error
 from typing_extensions import assert_never
 
-from .enums import MbtiDimension, MetricName
+from .enums import LabelType, MbtiDimension, MetricName
 
 logger = logging.getLogger(__name__)
 
@@ -67,11 +67,11 @@ class Metric:
 
     @classmethod
     def _acc_score(cls, y_true: np.ndarray, y_pred: np.ndarray) -> float:
-        return accuracy_score(y_true, y_pred)
+        return accuracy_score(y_true, y_pred) * 100
 
     @classmethod
     def _f1_score(cls, y_true: np.ndarray, y_pred: np.ndarray) -> float:
-        return f1_score(y_true, y_pred, average="macro")
+        return f1_score(y_true, y_pred, average="macro") * 100
 
 
 class Exacter:
@@ -143,13 +143,30 @@ class Evaluator:
 
         return np.array([softlabel[0] for softlabel in db_data])
 
-    def _get_score_from_text(self, id: int, text: str) -> float:
+    def _get_human_hardlables(self) -> np.ndarray:
+        conn = sqlite3.connect(self._database_path)
+        c = conn.cursor()
+        c.execute(f"SELECT hardlabel FROM {self._dim.only_letter}")
+        db_data = c.fetchall()
+        conn.close()
+
+        return np.array([softlabel[0] for softlabel in db_data])
+
+    def _get_softlabel_from_text(self, id: int, text: str) -> float:
         score = Exacter.get_softlabel(text)
         if score is not None:
             return score
         else:
             logger.info(f"Data id={id}, bad response from model: {text}, using default 0.5 score")
             return 0.5
+
+    def _get_hardlabel_from_text(self, id: int, text: str) -> str:
+        label = Exacter.get_hardlabel(self._dim, text)
+        if label is not None:
+            return label
+        else:
+            logger.info(f"Data id={id}, bad response from model: {text}, using default 1 score")
+            return 1
 
     def _get_model_softlabels(self) -> np.ndarray:
         conn = sqlite3.connect(self._database_path)
@@ -158,7 +175,16 @@ class Evaluator:
         db_data = c.fetchall()
         conn.close()
 
-        return np.array([self._get_score_from_text(id, response) for id, response in db_data])
+        return np.array([self._get_softlabel_from_text(id, response) for id, response in db_data])
+
+    def _get_model_hardlabels(self) -> np.ndarray:
+        conn = sqlite3.connect(self._database_path)
+        c = conn.cursor()
+        c.execute(f"SELECT id, response FROM {self._dim.only_letter}")
+        db_data = c.fetchall()
+        conn.close()
+
+        return np.array([self._get_hardlabel_from_text(id, response) for id, response in db_data])
 
     def _get_baseline_softlabels(self) -> np.ndarray:
         conn = sqlite3.connect(self._database_path)
@@ -169,7 +195,12 @@ class Evaluator:
 
         return np.repeat(np.mean(db_data), len(db_data))
 
-    def eval(self, metrics: List[MetricName]) -> List[float]:
-        # y_true, y_pred = np.array(self._get_human_softlables()), np.array(self._get_baseline_softlabels())
-        y_true, y_pred = np.array(self._get_human_softlables()), np.array(self._get_model_softlabels())
+    def eval(self, type: LabelType, metrics: List[MetricName]) -> List[float]:
+        if type == LabelType.SOFT:
+            # y_true, y_pred = np.array(self._get_human_softlables()), np.array(self._get_baseline_softlabels())
+            y_true, y_pred = np.array(self._get_human_softlables()), np.array(self._get_model_softlabels())
+        elif type == LabelType.HARD:
+            y_true, y_pred = np.array(self._get_human_hardlables()), np.array(self._get_model_hardlabels())
+        else:
+            assert_never()
         return [Metric.compute(metric, y_true, y_pred) for metric in metrics]
