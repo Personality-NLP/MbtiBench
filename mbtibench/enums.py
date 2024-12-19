@@ -14,16 +14,7 @@ class MbtiDimension(Enum):
 
     @property
     def full_name(self) -> str:
-        if self == MbtiDimension.EI:
-            return "Extraversion or Introversion"
-        elif self == MbtiDimension.SN:
-            return "Sensing or Intuition"
-        elif self == MbtiDimension.TF:
-            return "Thinking or Feeling"
-        elif self == MbtiDimension.JP:
-            return "Judging or Perceiving"
-        else:
-            assert_never()
+        return f"{self.full_first_letter} or {self.full_second_letter}"
 
     @property
     def rank(self) -> str:
@@ -47,21 +38,38 @@ class MbtiDimension(Enum):
         return self.value[2]
 
     @property
+    def full_first_letter(self) -> str:
+        if self == MbtiDimension.EI:
+            return "Extraversion"
+        elif self == MbtiDimension.SN:
+            return "Sensing"
+        elif self == MbtiDimension.TF:
+            return "Thinking"
+        elif self == MbtiDimension.JP:
+            return "Judging"
+        else:
+            assert_never()
+
+    @property
+    def full_second_letter(self) -> str:
+        if self == MbtiDimension.EI:
+            return "Introversion"
+        elif self == MbtiDimension.SN:
+            return "Intuition"
+        elif self == MbtiDimension.TF:
+            return "Feeling"
+        elif self == MbtiDimension.JP:
+            return "Perceiving"
+        else:
+            assert_never()
+
+    @property
     def only_letter(self) -> str:
         return self.value.replace("/", "")
 
     @property
     def full_hard_choices(self) -> str:
-        if self == MbtiDimension.EI:
-            return 'A: "Extraversion" or B: "Introversion"'
-        elif self == MbtiDimension.SN:
-            return 'A: "Sensing" or B: "Intuition"'
-        elif self == MbtiDimension.TF:
-            return 'A: "Thinking" or B: "Feeling"'
-        elif self == MbtiDimension.JP:
-            return 'A: "Judging" or B: "Perceiving"'
-        else:
-            assert_never()
+        return f"A: {self.full_first_letter} or B: {self.full_second_letter}"
 
 
 class SubDataset(Enum):
