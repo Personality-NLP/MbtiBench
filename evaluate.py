@@ -24,7 +24,7 @@ def main(args: Arguments):
         if args.model.is_gpt4 and round > 1:
             break  # GPT-4 only has 1 round
         for dim in MbtiDimension:
-            database_path = Path("results") / f"round-{round}" / f"{args.type}--{args.model}--{args.method}.db"
+            database_path = Path("results-reproduce") / f"round-{round}" / f"{args.type}--{args.model}--{args.method}.db"
             evalutor = Evaluator(database_path, dim)
             if args.type == LabelType.SOFT:
                 s_rmse, s_mae = evalutor.eval(args.type, [MetricName.S_RMSE, MetricName.S_MAE])
