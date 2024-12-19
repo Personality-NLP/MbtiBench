@@ -2,9 +2,12 @@
 
 # <span style="font-variant:small-caps;">MbtiBench</span>
 
+[![Paper](https://img.shields.io/badge/arXiv-2412.12510-b31b1b.svg)](https://arxiv.org/abs/2412.12510)
+<!-- [![Homepage](https://img.shields.io/badge/🏠-Homepage-3C47EB.svg)](TODO) &nbsp;&nbsp; [![Paper](https://img.shields.io/badge/arXiv-2412.12510-b31b1b.svg)](https://arxiv.org/abs/2412.12510) -->
+
 </div>
 
-Code for <span style="font-variant:small-caps;">*MbtiBench*</span> *: An MBTI Personality Detection Dataset Aligned with Population Traits*
+Code for *Can Large Language Models Understand You Better? An MBTI Personality Detection Dataset Aligned with Population Traits*
 
 ## 💡 Introduction
 
@@ -126,7 +129,7 @@ $ python inference.py --method zero-shot --type soft --model llama3.1-70b --host
 
 > If you wish to perform hard label evaluation, simply use `--type hard` instead of `--type soft.py`.
 
-To facilitate batch evaluation, we provide `launcher.sh`. You can submit batch evaluation tasks by running `bash launcher.sh`.
+To facilitate batch evaluation, we provide `scripts/launcher.sh`. You can submit batch evaluation tasks by running `bash scripts/launcher.sh`.
 
 ### 📈 Result Summarization
 
@@ -157,3 +160,66 @@ You can find more detailed information in our paper.
 
 > [!NOTE]
 > Our experiment logs can be found [here](./results-reproduce) for reproducing the results shown in the table.
+
+<details>
+<summary>
+
+## Soft Label Effectiveness Validation
+
+</summary>
+
+We use the stress detection dataset Dreaddit to validate the effectiveness of soft labels. Each entry in Dreaddit is a post from a poster, and the task requires the LLM to determine whether the poster is under stress based on their post. We aim to leverage the personality information extracted from the post to help the LLM perform better in the stress detection task.
+
+The process is divided into two steps:
+
+**Step 1**: Identify the personality information of the poster based on the post:
+
+```shell
+$ export PYTHONPATH=$(pwd)
+$ python downstream/inference-mbti.py --method zero-shot --type soft --model gpt-4o --round 0
+```
+
+> If you wish to perform hard label evaluation, simply use `--type hard` instead of `--type soft.py`.
+
+To facilitate batch inference, we provide `scripts/downstream-mbti-launcher.sh`. You can submit batch inference tasks by running `bash scripts/downstream-mbti-launcher.sh`.
+
+**Step 2**: Use the personality information to help the LLM perform the stress detection task:
+
+```shell
+$ export PYTHONPATH=$(pwd)
+$ python downstream/inference-task.py --method zero-shot --type soft --model llama3.1-70b --host <VLLM_SERVER_IP> --port <VLLM_SERVER_PORT> --mbti_model gpt-4o --round 1
+```
+
+> If you wish to perform hard label evaluation, simply use `--type hard` instead of `--type soft.py`.
+
+To facilitate batch inference, we provide `scripts/downstream-task-launcher.sh`. You can submit batch inference tasks by running `bash scripts/downstream-task-launcher.sh`.
+
+To obtain performance metrics for the LLM in the stress detection task, you need to register the personality label type, the model used for personality detection, and the model used for the stress detection task in the `downstream/evaluate.py` file. Here's an example:
+
+```python
+configs = [
+    {"type": None, "task_model": "llama3.1-70b", "mbti_model": None},
+    {"type": "hard", "task_model": "llama3.1-70b", "mbti_model": "gpt-4o"},
+    {"type": "soft", "task_model": "llama3.1-70b", "mbti_model": "gpt-4o"},
+]
+```
+
+Then, you can run this file to obtain the LLM's performance in the stress detection task:
+
+```shell
+$ export PYTHONPATH=$(pwd)
+$ python downstream/evaluate.py
+```
+
+</details>
+
+## 📝 Citation
+
+```latex
+@inproceedings{Li2024CanLL, 
+  title={Can Large Language Models Understand You Better? An MBTI Personality Detection Dataset Aligned with Population Traits}, 
+  author={Bohan Li and Jiannan Guan and Longxu Dou and Yunlong Feng and Dingzirui Wang and Yang Xu and Enbo Wang and Qiguang Chen and Bichen Wang and Xiao Xu and Yimeng Zhang and Libo Qin and Yanyan Zhao and Qingfu Zhu and Wanxiang Che}, 
+  year={2024}, 
+  url={https://api.semanticscholar.org/CorpusID:274788748} 
+}
+```
